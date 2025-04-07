@@ -73,7 +73,7 @@ const getAllTasks = asyncHandler(async (req, res, next) => {
 
 const deleteTask = asyncHandler(async (req, res, next) => {
     const loggedInAdminId = req.user.id;
-    const { id:taskId } = req.params;
+    const { id: taskId } = req.params;
 
     if (!loggedInAdminId) {
         return next(new ApiError(400, "Only Admin can delete task"));
@@ -105,7 +105,59 @@ const deleteTask = asyncHandler(async (req, res, next) => {
 });
 
 const updateTask = asyncHandler(async (req, res, next) => {
+    const loggedInAdminId = req.user.id;
 
+    if (!loggedInAdminId) {
+        return next(new ApiError(400, "Only Admin can update task"));
+    }
+
+    const admin = await User.findById(loggedInAdminId);
+
+    if (!admin) {
+        return next(new ApiError(400, "Admin not found"));
+    }
+
+    const { id: taskId } = req.params;
+
+    const task = await Task.findById(taskId);
+
+    if (!task) {
+        return next(new ApiError(400, "Task not found"));
+    }
+
+    if (task.createdBy.toString() !== loggedInAdminId) {
+        return next(new ApiError(400, "You are not authorized to update this task"));
+    }
+
+    const { title, description, status, priority, dueDate, assignedTo } = req.body;
+
+    if (!title || !description || !status || !priority || !dueDate || !assignedTo) {
+        return next(new ApiError(400, "All fields are required"));
+    }
+
+    const updatedTask = await Task.findByIdAndUpdate(taskId, {
+        title,
+        description,
+        status,
+        priority,
+        dueDate,
+        assignedTo,
+        createdBy: loggedInAdminId,
+    }, {
+        new: true,
+    });
+
+    if (!updatedTask) {
+        return next(new ApiError(400, "Failed to update task"));
+    }
+
+    const updatedAdmin = await User.findbyId(loggedInAdminId).populate("myTasks");
+
+    if (!updatedAdmin) {
+        return next(new ApiError(400, "Admin not found"));
+    }
+
+    res.status(200).json(new ApiResponse(200, true, updatedTask, "Task updated successfully"));
 });
 
 const toggleTask = asyncHandler(async (req, res, next) => {
