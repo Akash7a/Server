@@ -31,7 +31,7 @@ const createTask = asyncHandler(async (req, res, next) => {
         priority,
         dueDate,
         assignedTo,
-        createdBy:loggedInAdminId,
+        createdBy: loggedInAdminId,
     });
 
     if (!task) {
@@ -45,11 +45,63 @@ const createTask = asyncHandler(async (req, res, next) => {
 });
 
 const getAllTasks = asyncHandler(async (req, res, next) => {
+    const loggedInAdminId = req.user.id;
+
+    if (!loggedInAdminId) {
+        return next(new ApiError(400, "Only Admin can get all tasks"));
+    };
+
+    const admin = await User.findById(loggedInAdminId);
+
+    if (!admin) {
+        return next(new ApiError(400, "Admin not found"));
+    }
+
+    console.log("Fetching tasks for admin:", loggedInAdminId);
+
+    const tasks = await Task.find({ createdBy: loggedInAdminId }).populate("assignedTo").sort({ createdAt: -1 });
+
+    console.log("Fetched tasks:", tasks.length);
+
+    if (!tasks.length) {
+        return next(new ApiError(400, "Failed to get tasks"));
+    }
+
+    res.status(200).json(new ApiResponse(200, true, tasks, "Tasks fetched successfully"));
 
 });
 
 const deleteTask = asyncHandler(async (req, res, next) => {
+    const loggedInAdminId = req.user.id;
+    const { id:taskId } = req.params;
 
+    if (!loggedInAdminId) {
+        return next(new ApiError(400, "Only Admin can delete task"));
+    }
+
+    const admin = await User.findById(loggedInAdminId);
+
+    if (!admin) {
+        return next(new ApiError(400, "Admin not found"));
+    }
+
+    const task = await Task.findById(taskId);
+
+    if (!task) {
+        return next(new ApiError(400, "Task not found"));
+    }
+
+    if (task.createdBy.toString() !== loggedInAdminId) {
+        return next(new ApiError(400, "You are not authorized to delete this task"));
+    }
+
+    await Task.findByIdAndDelete(taskId);
+
+    admin.myTasks = admin.myTasks.filter(taskIdInArray => taskIdInArray.toString() !== taskId);
+
+    await admin.save();
+
+    res.status(200).json(new ApiResponse(200, true, null, "Task deleted successfully"));
 });
 
 const updateTask = asyncHandler(async (req, res, next) => {
