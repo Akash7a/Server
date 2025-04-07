@@ -161,7 +161,41 @@ const updateTask = asyncHandler(async (req, res, next) => {
 });
 
 const toggleTask = asyncHandler(async (req, res, next) => {
+    const loggedInAdminId = req.user.id;
 
+    if (!loggedInAdminId) {
+        return next(new ApiError(400, "Only Admin can toggle task"));
+    }
+
+    const { id: taskId } = req.params;
+
+    const task = await Task.findById(taskId);
+
+    if (!task) {
+        return next(new ApiError(400, "Task not found"));
+    }
+
+    if (task.createdBy.toString() !== loggedInAdminId) {
+        return next(new ApiError(400, "You are not authorized to toggle this task"));
+    }
+
+    switch (task.status) {
+        case "pending":
+            task.status = "in-progress";
+            break;
+        case "in-progress":
+            task.status = "completed";
+            break;
+        case "completed":
+            task.status = "pending";
+            break;
+        default:
+            return next(new ApiError(400, "invalid task status"));
+    }
+    
+    await task.save();
+
+    return res.status(200).json(new ApiResponse(200, true, task, "Task toggled successfully"));
 });
 
 const getTask = asyncHandler(async (req, res, next) => {
