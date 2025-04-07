@@ -34,6 +34,12 @@ const userSchema = new Schema(
             enum: ["admin", "user"],
             default: "user",
         },
+        myTasks: [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: "Task",
+            }
+        ],
     },
     {
         timestamps: true,
