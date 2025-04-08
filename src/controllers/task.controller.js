@@ -24,6 +24,12 @@ const createTask = asyncHandler(async (req, res, next) => {
         return next(new ApiError(400, "All fields are required"));
     }
 
+    const existingTask = await Task.findOne({title});
+
+    if(existingTask){
+        return next(new ApiError(400,"Task already exists try with diffrent title."));
+    }
+
     const task = await Task.create({
         title,
         description,
@@ -38,10 +44,12 @@ const createTask = asyncHandler(async (req, res, next) => {
         return next(new ApiError(400, "Failed to create task"));
     }
 
-    admin.myTasks.push(task._id);
+    if (!admin.myTasks.includes(task._id)) {
+        admin.myTasks.push(task._id);
+    }
     await admin.save();
 
-    res.status(201).json(new ApiResponse(201, true, task, "Task created successfully"));
+    res.status(201).json(new ApiResponse(201, task, "Task created successfully", true));
 });
 
 const getAllTasks = asyncHandler(async (req, res, next) => {
@@ -59,15 +67,17 @@ const getAllTasks = asyncHandler(async (req, res, next) => {
 
     console.log("Fetching tasks for admin:", loggedInAdminId);
 
-    const tasks = await Task.find({ createdBy: loggedInAdminId }).populate("assignedTo").sort({ createdAt: -1 });
-
+    const tasks = await Task.find({ createdBy: loggedInAdminId })
+    .populate("assignedTo")
+    .sort({ createdAt: -1 });
+    
     console.log("Fetched tasks:", tasks.length);
 
     if (!tasks.length) {
         return next(new ApiError(400, "Failed to get tasks"));
     }
 
-    res.status(200).json(new ApiResponse(200, true, tasks, "Tasks fetched successfully"));
+    res.status(200).json(new ApiResponse(200, tasks, "Tasks fetched successfully", true));
 
 });
 
@@ -101,7 +111,7 @@ const deleteTask = asyncHandler(async (req, res, next) => {
 
     await admin.save();
 
-    res.status(200).json(new ApiResponse(200, true, null, "Task deleted successfully"));
+    res.status(200).json(new ApiResponse(200, null, "Task deleted successfully", true));
 });
 
 const updateTask = asyncHandler(async (req, res, next) => {
@@ -151,13 +161,13 @@ const updateTask = asyncHandler(async (req, res, next) => {
         return next(new ApiError(400, "Failed to update task"));
     }
 
-    const updatedAdmin = await User.findbyId(loggedInAdminId).populate("myTasks");
+    const updatedAdmin = await User.findById(loggedInAdminId).populate("myTasks");
 
     if (!updatedAdmin) {
         return next(new ApiError(400, "Admin not found"));
     }
 
-    res.status(200).json(new ApiResponse(200, true, updatedTask, "Task updated successfully"));
+    res.status(200).json(new ApiResponse(200, updatedTask, "Task updated successfully", true));
 });
 
 const toggleTask = asyncHandler(async (req, res, next) => {
@@ -195,7 +205,7 @@ const toggleTask = asyncHandler(async (req, res, next) => {
 
     await task.save();
 
-    return res.status(200).json(new ApiResponse(200, true, task, "Task toggled successfully"));
+    return res.status(200).json(new ApiResponse(200, task, "Task toggled successfully", true));
 });
 
 const getTask = asyncHandler(async (req, res, next) => {
@@ -207,7 +217,7 @@ const getTask = asyncHandler(async (req, res, next) => {
 
     const { id: taskId } = req.params;
 
-    const task = await Task.findById(taskId).populate("assignedTo"); 
+    const task = await Task.findById(taskId).populate("assignedTo");
 
     if (!task) {
         return next(new ApiError(400, "Task not found"));
@@ -217,7 +227,7 @@ const getTask = asyncHandler(async (req, res, next) => {
         return next(new ApiError(400, "You are not authorized to access this task"));
     }
 
-    return res.status(200).json(new ApiResponse(200, true, task, "Task fetched successfully"));
+    return res.status(200).json(new ApiResponse(200, task, "Task fetched successfully", true));
 });
 
 export {
